@@ -32,11 +32,6 @@ on:
         type: boolean
         default: false
         description: "Whether to only use changelog for current version"
-      configuration:
-        required: false
-        type: string
-        default: ""
-        description: "JSON configuration for changelog builder"
       
 jobs:
   build:
@@ -80,14 +75,12 @@ jobs:
           package-path: ${{ env.unityPackage }}
           include-files: metaList
 
-      - name: Build Changelog
-        id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+      - name: Get Changelog Entry
+        id: changelog_reader
+        uses: mindsers/changelog-reader-action@v2
         with:
-          configuration: ${{ inputs.configuration }}
-          toTag: ${{ steps.version.outputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          version: ${{ steps.version.outputs.version }}
+          path: ${{ inputs.changelog-file }}
 
       - name: Prepare Release Files
         id: prepare_files
@@ -105,6 +98,6 @@ jobs:
       - name: Make Release
         uses: softprops/action-gh-release@v1
         with:
-          body: ${{ steps.build_changelog.outputs.changelog }}
+          body: ${{ steps.changelog_reader.outputs.changes }}
           files: ${{ steps.prepare_files.outputs.files }}
           tag_name: ${{ steps.version.outputs.version }} 
