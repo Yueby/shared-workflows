@@ -67,10 +67,17 @@ jobs:
 
       - name: Get Changelog Entry
         id: changelog_reader
+        continue-on-error: true
         uses: mindsers/changelog-reader-action@v2
         with:
           version: ${{ steps.version.outputs.version }}
           path: ${{ inputs.changelog-file }}
+
+      - name: Set Default Changelog
+        if: steps.changelog_reader.outcome == 'failure'
+        id: default_changelog
+        run: |
+          echo "changes=Release version ${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Prepare Release Files
         id: prepare_files
@@ -84,6 +91,6 @@ jobs:
       - name: Make Release
         uses: softprops/action-gh-release@v1
         with:
-          body: ${{ steps.changelog_reader.outputs.changes }}
+          body: ${{ steps.changelog_reader.outcome == 'success' && steps.changelog_reader.outputs.changes || steps.default_changelog.outputs.changes }}
           files: ${{ steps.prepare_files.outputs.files }}
           tag_name: ${{ steps.version.outputs.version }} 
