@@ -104,9 +104,17 @@ jobs:
           FILES="${FILES}${{ inputs.version-file }}"
           echo "files=${FILES}" >> $GITHUB_OUTPUT
 
+      - name: Read Changelog
+        id: changelog
+        if: ! inputs.use-current-version-changelog
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat ${{ inputs.changelog-file }} >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Make Release
         uses: softprops/action-gh-release@v1
         with:
-          body: ${{ inputs.use-current-version-changelog && steps.build_changelog.outputs.changelog || inputs.changelog-file }}
+          body: ${{ inputs.use-current-version-changelog && steps.build_changelog.outputs.changelog || steps.changelog.outputs.content }}
           files: ${{ steps.prepare_files.outputs.files }}
           tag_name: ${{ steps.version.outputs.version }} 
