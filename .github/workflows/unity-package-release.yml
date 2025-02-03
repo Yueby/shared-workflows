@@ -43,12 +43,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          if [ -f "${{ inputs.version-file }}" ]; then
-            echo "version=$(cat ${{ inputs.version-file }} | jq -r .version)" >> $GITHUB_OUTPUT
-          else
-            echo "Error: Version file not found: ${{ inputs.version-file }}"
-            exit 1
-          fi
+          echo "version=$(jq -r .version ${{ inputs.version-file }})" >> $GITHUB_OUTPUT
     
       - name: Set Environment Variables
         run: |
@@ -80,15 +75,11 @@ jobs:
       - name: Prepare Release Files
         id: prepare_files
         run: |
-          FILES=""
-          if [ "${{ inputs.create-zip }}" == "true" ]; then
-            FILES="${FILES}${{ env.zipFile }},"
-          fi
-          if [ "${{ inputs.create-unity-package }}" == "true" ]; then
-            FILES="${FILES}${{ env.unityPackage }},"
-          fi
-          FILES="${FILES}${{ inputs.version-file }}"
-          echo "files=${FILES}" >> $GITHUB_OUTPUT
+          files=()
+          [[ "${{ inputs.create-zip }}" == "true" ]] && files+=("${{ env.zipFile }}")
+          [[ "${{ inputs.create-unity-package }}" == "true" ]] && files+=("${{ env.unityPackage }}")
+          files+=("${{ inputs.version-file }}")
+          echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
         uses: softprops/action-gh-release@v1
