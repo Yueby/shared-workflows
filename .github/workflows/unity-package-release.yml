@@ -1,0 +1,89 @@
+name: Unity Package Release
+
+on:
+  workflow_call:
+    inputs:
+      package-name:
+        required: true
+        type: string
+        description: "The name of the package to be released"
+      create-unity-package:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to create .unitypackage file"
+      create-zip:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to create zip file"
+      version-file:
+        required: false
+        type: string
+        default: "package.json"
+        description: "File to read version from"
+      changelog-file:
+        required: false
+        type: string
+        default: "CHANGELOG.md"
+        description: "Path to changelog file"
+      
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Version
+        id: version
+        run: |
+          if [ -f "${{ inputs.version-file }}" ]; then
+            echo "version=$(cat ${{ inputs.version-file }} | jq -r .version)" >> $GITHUB_OUTPUT
+          else
+            echo "Error: Version file not found: ${{ inputs.version-file }}"
+            exit 1
+          fi
+    
+      - name: Set Environment Variables
+        run: |
+          echo "zipFile=${{ inputs.package-name }}-${{ steps.version.outputs.version }}.zip" >> $GITHUB_ENV
+          echo "unityPackage=${{ inputs.package-name }}-${{ steps.version.outputs.version }}.unitypackage" >> $GITHUB_ENV
+
+      - name: Create Package Zip
+        if: inputs.create-zip
+        run: zip -r "${{ github.workspace }}/${{ env.zipFile }}" .
+      
+      - name: Track Package Meta Files
+        if: inputs.create-unity-package
+        run: find . -name \*.meta >> metaList
+      
+      - name: Create UnityPackage
+        if: inputs.create-unity-package
+        uses: pCYSl5EDgo/create-unitypackage@v1.2.3
+        with:
+          package-path: ${{ env.unityPackage }}
+          include-files: metaList
+      
+      - name: Prepare Release Files
+        id: prepare_files
+        run: |
+          FILES=""
+          if [ "${{ inputs.create-zip }}" == "true" ]; then
+            FILES="${FILES}${{ env.zipFile }}\n"
+          fi
+          if [ "${{ inputs.create-unity-package }}" == "true" ]; then
+            FILES="${FILES}${{ env.unityPackage }}\n"
+          fi
+          FILES="${FILES}${{ inputs.version-file }}"
+          echo "files=${FILES}" >> $GITHUB_OUTPUT
+
+      - name: Make Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: ${{ inputs.changelog-file }}
+          files: ${{ steps.prepare_files.outputs.files }}
+          tag_name: ${{ steps.version.outputs.version }} 
