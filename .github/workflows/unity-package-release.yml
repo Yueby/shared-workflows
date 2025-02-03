@@ -108,9 +108,8 @@ jobs:
         id: changelog
         if: inputs.use-current-version-changelog != true
         run: |
-          echo "content<<EOF" >> $GITHUB_OUTPUT
-          cat ${{ inputs.changelog-file }} >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          CHANGELOG_CONTENT=$(cat ${{ inputs.changelog-file }})
+          echo "content=$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
 
       - name: Make Release
         uses: softprops/action-gh-release@v1
