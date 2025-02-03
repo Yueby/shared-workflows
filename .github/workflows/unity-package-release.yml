@@ -27,6 +27,16 @@ on:
         type: string
         default: "CHANGELOG.md"
         description: "Path to changelog file"
+      use-current-version-changelog:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether to only use changelog for current version"
+      configuration:
+        required: false
+        type: string
+        default: ""
+        description: "JSON configuration for changelog builder"
       
 jobs:
   build:
@@ -37,6 +47,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取所有历史记录用于生成changelog
 
       - name: Get Version
         id: version
@@ -67,6 +79,17 @@ jobs:
         with:
           package-path: ${{ env.unityPackage }}
           include-files: metaList
+
+      - name: Build Changelog
+        id: build_changelog
+        if: inputs.use-current-version-changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: ${{ inputs.configuration }}
+          toTag: ${{ steps.version.outputs.version }}
+          commitMode: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       
       - name: Prepare Release Files
         id: prepare_files
@@ -84,6 +107,6 @@ jobs:
       - name: Make Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: ${{ inputs.changelog-file }}
+          body: ${{ inputs.use-current-version-changelog && steps.build_changelog.outputs.changelog || inputs.changelog-file }}
           files: ${{ steps.prepare_files.outputs.files }}
           tag_name: ${{ steps.version.outputs.version }} 
