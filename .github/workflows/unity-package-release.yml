@@ -108,8 +108,10 @@ jobs:
         id: changelog
         if: inputs.use-current-version-changelog != true
         run: |
-          CHANGELOG_CONTENT=$(cat ${{ inputs.changelog-file }})
-          echo "content=$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          delimiter="$(openssl rand -hex 8)"
+          echo "content<<$delimiter" >> $GITHUB_OUTPUT
+          cat ${{ inputs.changelog-file }} >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
 
       - name: Make Release
         uses: softprops/action-gh-release@v1
