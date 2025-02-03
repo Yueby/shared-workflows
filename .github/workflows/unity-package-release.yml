@@ -96,10 +96,10 @@ jobs:
         run: |
           FILES=""
           if [ "${{ inputs.create-zip }}" == "true" ]; then
-            FILES="${FILES}${{ env.zipFile }} "
+            FILES="${FILES}${{ env.zipFile }},"
           fi
           if [ "${{ inputs.create-unity-package }}" == "true" ]; then
-            FILES="${FILES}${{ env.unityPackage }} "
+            FILES="${FILES}${{ env.unityPackage }},"
           fi
           FILES="${FILES}${{ inputs.version-file }}"
           echo "files=${FILES}" >> $GITHUB_OUTPUT
