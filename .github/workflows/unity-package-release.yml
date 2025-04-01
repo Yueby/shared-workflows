@@ -27,16 +27,6 @@ on:
         type: string
         default: "CHANGELOG.md"
         description: "Path to changelog file"
-      draft:
-        required: false
-        type: boolean
-        default: false
-        description: "Create a draft release"
-      prerelease:
-        required: false
-        type: boolean
-        default: false
-        description: "Mark as prerelease"
 
 jobs:
   build:
@@ -57,9 +47,8 @@ jobs:
             echo "Error: ${{ inputs.version-file }} not found"
             exit 1
           fi
-          version=$(jq -r .version ${{ inputs.version-file }})
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "Found version: $version"
+          echo "version=$(jq -r .version ${{ inputs.version-file }})" >> $GITHUB_OUTPUT
+          echo "Found version: $(jq -r .version ${{ inputs.version-file }})"
     
       - name: Set Environment Variables
         run: |
@@ -71,7 +60,7 @@ jobs:
         if: inputs.create-zip
         run: |
           cd ${{ github.workspace }}
-          zip -r "${{ env.zipFileName }}" . -x "*.git*" "*.github*"
+          zip -r "${{ env.zipFileName }}" .
           if [ ! -f "${{ env.zipFileName }}" ]; then
             echo "Error: Failed to create zip file"
             exit 1
@@ -79,8 +68,7 @@ jobs:
       
       - name: Track Package Meta Files
         if: inputs.create-unity-package
-        run: |
-          find . -name "*.meta" -not -path "./.git*" -not -path "./.github*" >> metaList
+        run: find . -name \*.meta >> metaList
       
       - name: Create UnityPackage
         if: inputs.create-unity-package
@@ -106,25 +94,26 @@ jobs:
       - name: Prepare Release Files
         id: prepare_files
         run: |
-          declare -a files=()
+          # Initialize array for file paths
+          files=()
           
-          for file in \
-            "$([[ "${{ inputs.create-zip }}" == "true" ]] && echo "./${{ env.zipFileName }}")" \
-            "$([[ "${{ inputs.create-unity-package }}" == "true" ]] && echo "./${{ env.unityPackageFileName }}")" \
-            "./${{ inputs.version-file }}"; do
-            if [[ -n "$file" && -f "$file" ]]; then
-              files+=("$file")
-            fi
-          done
-          
-          if [[ ${#files[@]} -eq 0 ]]; then
-            echo "Error: No files found for release"
-            exit 1
+          # Add files with proper formatting
+          if [[ "${{ inputs.create-zip }}" == "true" && -f "${{ env.zipFileName }}" ]]; then
+            files+=("./${{ env.zipFileName }}")
+          fi
+          if [[ "${{ inputs.create-unity-package }}" == "true" && -f "${{ env.unityPackageFileName }}" ]]; then
+            files+=("./${{ env.unityPackageFileName }}")
+          fi
+          if [[ -f "${{ inputs.version-file }}" ]]; then
+            files+=("./${{ inputs.version-file }}")
           fi
           
+          # Debug output
           echo "Files to be released:"
           printf "%s\n" "${files[@]}"
           
+          # Convert array to comma-separated string for output
+          IFS=','
           echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
@@ -132,6 +121,4 @@ jobs:
         with:
           body: ${{ steps.changelog_reader.outcome == 'success' && steps.changelog_reader.outputs.changes || steps.default_changelog.outputs.changes }}
           files: ${{ steps.prepare_files.outputs.files }}
-          tag_name: ${{ steps.version.outputs.version }}
-          draft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }} 
+          tag_name: ${{ steps.version.outputs.version }} 
