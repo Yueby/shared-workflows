@@ -121,25 +121,22 @@ jobs:
       - name: Prepare Release Files
         id: prepare_files
         run: |
-          declare -a files=()
+          files=()
           
-          for file in \
-            "$([[ "${{ inputs.create-zip }}" == "true" ]] && echo "./${{ env.zipFileName }}")" \
-            "$([[ "${{ inputs.create-unity-package }}" == "true" ]] && echo "./${{ env.unityPackageFileName }}")" \
-            "./${{ inputs.version-file }}"; do
-            if [[ -n "$file" && -f "$file" ]]; then
-              files+=("$file")
-            fi
-          done
-          
-          if [[ ${#files[@]} -eq 0 ]]; then
-            echo "Error: No files found for release"
-            exit 1
+          if [[ "${{ inputs.create-zip }}" == "true" && -f "${{ env.zipFileName }}" ]]; then
+            files+=("${{ env.zipFileName }}")
+          fi
+          if [[ "${{ inputs.create-unity-package }}" == "true" && -f "${{ env.unityPackageFileName }}" ]]; then
+            files+=("${{ env.unityPackageFileName }}")
+          fi
+          if [[ -f "${{ inputs.version-file }}" ]]; then
+            files+=("${{ inputs.version-file }}")
           fi
           
           echo "Files to be released:"
           printf "%s\n" "${files[@]}"
           
+          # 不使用IFS，直接用空格连接
           echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
