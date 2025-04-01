@@ -43,16 +43,27 @@ jobs:
       - name: Get Version
         id: version
         run: |
+          if [ ! -f "${{ inputs.version-file }}" ]; then
+            echo "错误：找不到 ${{ inputs.version-file }} 文件"
+            exit 1
+          fi
           echo "version=$(jq -r .version ${{ inputs.version-file }})" >> $GITHUB_OUTPUT
+          echo "找到版本号：$(jq -r .version ${{ inputs.version-file }})"
     
       - name: Set Environment Variables
         run: |
-          echo "zipFile=${{ inputs.package-name }}-${{ steps.version.outputs.version }}.zip" >> $GITHUB_ENV
-          echo "unityPackage=${{ inputs.package-name }}-${{ steps.version.outputs.version }}.unitypackage" >> $GITHUB_ENV
+          echo "zipFile=${{ github.workspace }}/${{ inputs.package-name }}-${{ steps.version.outputs.version }}.zip" >> $GITHUB_ENV
+          echo "unityPackage=${{ github.workspace }}/${{ inputs.package-name }}-${{ steps.version.outputs.version }}.unitypackage" >> $GITHUB_ENV
 
       - name: Create Package Zip
         if: inputs.create-zip
-        run: zip -r "${{ github.workspace }}/${{ env.zipFile }}" .
+        run: |
+          cd ${{ github.workspace }}
+          zip -r "${{ env.zipFile }}" .
+          if [ ! -f "${{ env.zipFile }}" ]; then
+            echo "错误：zip文件创建失败"
+            exit 1
+          fi
       
       - name: Track Package Meta Files
         if: inputs.create-unity-package
@@ -83,9 +94,18 @@ jobs:
         id: prepare_files
         run: |
           files=()
-          [[ "${{ inputs.create-zip }}" == "true" ]] && files+=("${{ env.zipFile }}")
-          [[ "${{ inputs.create-unity-package }}" == "true" ]] && files+=("${{ env.unityPackage }}")
-          files+=("${{ inputs.version-file }}")
+          if [[ "${{ inputs.create-zip }}" == "true" ]]; then
+            files+=("${{ env.zipFile }}")
+          fi
+          if [[ "${{ inputs.create-unity-package }}" == "true" ]]; then
+            files+=("${{ env.unityPackage }}")
+          fi
+          # 确保使用正确的package.json路径
+          if [[ -f "${{ github.workspace }}/${{ inputs.version-file }}" ]]; then
+            files+=("${{ inputs.version-file }}")
+          fi
+          echo "准备发布的文件："
+          printf '%s\n' "${files[@]}"
           echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
