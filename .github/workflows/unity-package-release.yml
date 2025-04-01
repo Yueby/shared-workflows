@@ -94,28 +94,26 @@ jobs:
       - name: Prepare Release Files
         id: prepare_files
         run: |
+          # Initialize array for file paths
           files=()
+          
+          # Add files with proper formatting
           if [[ "${{ inputs.create-zip }}" == "true" && -f "${{ env.zipFileName }}" ]]; then
-            files+=("${{ env.zipFileName }}")
+            files+=("./${{ env.zipFileName }}")
           fi
           if [[ "${{ inputs.create-unity-package }}" == "true" && -f "${{ env.unityPackageFileName }}" ]]; then
-            files+=("${{ env.unityPackageFileName }}")
+            files+=("./${{ env.unityPackageFileName }}")
           fi
           if [[ -f "${{ inputs.version-file }}" ]]; then
-            files+=("${{ inputs.version-file }}")
+            files+=("./${{ inputs.version-file }}")
           fi
           
-          # Verify file existence
-          echo "Verifying files:"
-          for file in "${files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "✓ Found: $file"
-            else
-              echo "✗ Missing: $file"
-            fi
-          done
+          # Debug output
+          echo "Files to be released:"
+          printf "%s\n" "${files[@]}"
           
-          # Set output
+          # Convert array to comma-separated string for output
+          IFS=','
           echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
