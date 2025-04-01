@@ -27,6 +27,31 @@ on:
         type: string
         default: "CHANGELOG.md"
         description: "Path to changelog file"
+      draft:
+        required: false
+        type: boolean
+        default: false
+        description: "Create a draft release"
+      prerelease:
+        required: false
+        type: boolean
+        default: false
+        description: "Mark as prerelease"
+      generate_release_notes:
+        required: false
+        type: boolean
+        default: true
+        description: "Auto-generate release notes"
+      fail_on_unmatched_files:
+        required: false
+        type: boolean
+        default: true
+        description: "Fail if any files are not found"
+      make_latest:
+        required: false
+        type: string
+        default: "true"
+        description: "Set as latest release"
 
 jobs:
   build:
@@ -47,8 +72,9 @@ jobs:
             echo "Error: ${{ inputs.version-file }} not found"
             exit 1
           fi
-          echo "version=$(jq -r .version ${{ inputs.version-file }})" >> $GITHUB_OUTPUT
-          echo "Found version: $(jq -r .version ${{ inputs.version-file }})"
+          version=$(jq -r .version ${{ inputs.version-file }})
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "Found version: $version"
     
       - name: Set Environment Variables
         run: |
@@ -60,7 +86,7 @@ jobs:
         if: inputs.create-zip
         run: |
           cd ${{ github.workspace }}
-          zip -r "${{ env.zipFileName }}" .
+          zip -r "${{ env.zipFileName }}" . -x "*.git*" "*.github*"
           if [ ! -f "${{ env.zipFileName }}" ]; then
             echo "Error: Failed to create zip file"
             exit 1
@@ -68,7 +94,8 @@ jobs:
       
       - name: Track Package Meta Files
         if: inputs.create-unity-package
-        run: find . -name \*.meta >> metaList
+        run: |
+          find . -name "*.meta" -not -path "./.git*" -not -path "./.github*" >> metaList
       
       - name: Create UnityPackage
         if: inputs.create-unity-package
@@ -94,31 +121,35 @@ jobs:
       - name: Prepare Release Files
         id: prepare_files
         run: |
-          # Initialize array for file paths
-          files=()
+          declare -a files=()
           
-          # Add files with proper formatting
-          if [[ "${{ inputs.create-zip }}" == "true" && -f "${{ env.zipFileName }}" ]]; then
-            files+=("./${{ env.zipFileName }}")
-          fi
-          if [[ "${{ inputs.create-unity-package }}" == "true" && -f "${{ env.unityPackageFileName }}" ]]; then
-            files+=("./${{ env.unityPackageFileName }}")
-          fi
-          if [[ -f "${{ inputs.version-file }}" ]]; then
-            files+=("./${{ inputs.version-file }}")
+          for file in \
+            "$([[ "${{ inputs.create-zip }}" == "true" ]] && echo "./${{ env.zipFileName }}")" \
+            "$([[ "${{ inputs.create-unity-package }}" == "true" ]] && echo "./${{ env.unityPackageFileName }}")" \
+            "./${{ inputs.version-file }}"; do
+            if [[ -n "$file" && -f "$file" ]]; then
+              files+=("$file")
+            fi
+          done
+          
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "Error: No files found for release"
+            exit 1
           fi
           
-          # Debug output
           echo "Files to be released:"
           printf "%s\n" "${files[@]}"
           
-          # Convert array to comma-separated string for output
-          IFS=','
           echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.changelog_reader.outcome == 'success' && steps.changelog_reader.outputs.changes || steps.default_changelog.outputs.changes }}
           files: ${{ steps.prepare_files.outputs.files }}
-          tag_name: ${{ steps.version.outputs.version }} 
+          tag_name: ${{ steps.version.outputs.version }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: ${{ inputs.generate_release_notes }}
+          fail_on_unmatched_files: ${{ inputs.fail_on_unmatched_files }}
+          make_latest: ${{ inputs.make_latest }} 
