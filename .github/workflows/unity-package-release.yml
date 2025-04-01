@@ -38,30 +38,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取所有历史记录用于生成changelog
+          fetch-depth: 0  # Get full history for changelog
 
       - name: Get Version
         id: version
         run: |
           if [ ! -f "${{ inputs.version-file }}" ]; then
-            echo "错误：找不到 ${{ inputs.version-file }} 文件"
+            echo "Error: ${{ inputs.version-file }} not found"
             exit 1
           fi
           echo "version=$(jq -r .version ${{ inputs.version-file }})" >> $GITHUB_OUTPUT
-          echo "找到版本号：$(jq -r .version ${{ inputs.version-file }})"
+          echo "Found version: $(jq -r .version ${{ inputs.version-file }})"
     
       - name: Set Environment Variables
         run: |
-          echo "zipFile=${{ github.workspace }}/${{ inputs.package-name }}-${{ steps.version.outputs.version }}.zip" >> $GITHUB_ENV
-          echo "unityPackage=${{ github.workspace }}/${{ inputs.package-name }}-${{ steps.version.outputs.version }}.unitypackage" >> $GITHUB_ENV
+          # Set filenames for release
+          echo "zipFileName=${{ inputs.package-name }}-${{ steps.version.outputs.version }}.zip" >> $GITHUB_ENV
+          echo "unityPackageFileName=${{ inputs.package-name }}-${{ steps.version.outputs.version }}.unitypackage" >> $GITHUB_ENV
 
       - name: Create Package Zip
         if: inputs.create-zip
         run: |
           cd ${{ github.workspace }}
-          zip -r "${{ env.zipFile }}" .
-          if [ ! -f "${{ env.zipFile }}" ]; then
-            echo "错误：zip文件创建失败"
+          zip -r "${{ env.zipFileName }}" .
+          if [ ! -f "${{ env.zipFileName }}" ]; then
+            echo "Error: Failed to create zip file"
             exit 1
           fi
       
@@ -73,7 +74,7 @@ jobs:
         if: inputs.create-unity-package
         uses: pCYSl5EDgo/create-unitypackage@v1.2.3
         with:
-          package-path: ${{ env.unityPackage }}
+          package-path: ${{ env.unityPackageFileName }}
           include-files: metaList
 
       - name: Get Changelog Entry
@@ -94,18 +95,27 @@ jobs:
         id: prepare_files
         run: |
           files=()
-          if [[ "${{ inputs.create-zip }}" == "true" ]]; then
-            files+=("${{ env.zipFile }}")
+          if [[ "${{ inputs.create-zip }}" == "true" && -f "${{ env.zipFileName }}" ]]; then
+            files+=("${{ env.zipFileName }}")
           fi
-          if [[ "${{ inputs.create-unity-package }}" == "true" ]]; then
-            files+=("${{ env.unityPackage }}")
+          if [[ "${{ inputs.create-unity-package }}" == "true" && -f "${{ env.unityPackageFileName }}" ]]; then
+            files+=("${{ env.unityPackageFileName }}")
           fi
-          # 确保使用正确的package.json路径
-          if [[ -f "${{ github.workspace }}/${{ inputs.version-file }}" ]]; then
+          if [[ -f "${{ inputs.version-file }}" ]]; then
             files+=("${{ inputs.version-file }}")
           fi
-          echo "准备发布的文件："
-          printf '%s\n' "${files[@]}"
+          
+          # Verify file existence
+          echo "Verifying files:"
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ Found: $file"
+            else
+              echo "✗ Missing: $file"
+            fi
+          done
+          
+          # Set output
           echo "files=${files[*]}" >> $GITHUB_OUTPUT
 
       - name: Make Release
